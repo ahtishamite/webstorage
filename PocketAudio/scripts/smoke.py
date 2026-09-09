@@ -31,6 +31,11 @@ for retry in range(8):
  tree=screen();edit=next((n for n in tree.iter('node') if n.attrib.get('class')=='android.widget.EditText'),None)
  if edit is not None:break
  print(ET.tostring(tree,encoding='unicode'))
+ if any("Pixel Launcher isn't responding" in n.attrib.get('text','') for n in tree.iter('node')):
+  close=next((n for n in tree.iter('node') if n.attrib.get('text')=='Close app'),None)
+  if close is not None:tap(close)
+  adb('shell','am','start','-W','-n','com.pocketaudio.app/.MainActivity');time.sleep(3)
+  continue
  for node in tree.iter('node'):
   if node.attrib.get('text') in ['OK','Got it','Continue','Allow']:tap(node)
  time.sleep(2)
