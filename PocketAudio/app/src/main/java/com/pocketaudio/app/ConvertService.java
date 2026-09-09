@@ -56,7 +56,7 @@ public class ConvertService extends Service {
         if(now-lastUpdate>350){getSystemService(NotificationManager.class).notify(7,notification());lastUpdate=now;}
     }
     private void check(){if(cancelled || Thread.currentThread().isInterrupted())throw new CancellationException();}
-    private void cancel(){cancelled=true;HttpURLConnection c=connection;if(c!=null)c.disconnect();}
+    private void cancel(){cancelled=true;SocialAudio.cancel();HttpURLConnection c=connection;if(c!=null)c.disconnect();}
     public void onTimeout(int startId,int fgsType){cancel();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
     public void onDestroy(){cancel();if(wake!=null && wake.isHeld())wake.release();super.onDestroy();}
     static URL checkedUrl(String text) throws Exception {
@@ -176,7 +176,10 @@ public class ConvertService extends Service {
         File video=null,audio=null;Uri pending=null;
         try {
             video=File.createTempFile("input-",".mp4",getCacheDir());audio=File.createTempFile("audio-",".mp3",getCacheDir());
-            download(url,video);check();decode(video,audio,bitrate);check();
+            SocialAudio.convert(this,url,audio,bitrate,new SocialAudio.Progress(){
+                public void update(String title,String message,int percent){ConvertService.this.update(title,message,percent);}
+                public boolean cancelled(){return cancelled;}
+            });check();
             update("Saving audio","Adding MP3 to Downloads / PocketAudio…",97);
             String safe=(name==null?"audio":name).replaceAll("(?i)\\.mp3$", "").replaceAll("[^\\p{L}\\p{N} _-]","_").trim();
             if(safe.isEmpty())safe="audio";if(safe.length()>80)safe=safe.substring(0,80);

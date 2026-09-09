@@ -33,10 +33,10 @@ public class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT<30){root.setOnApplyWindowInsetsListener(null);root.setFitsSystemWindows(true);}
         root.addView(text("POCKET AUDIO",13,purple,true));gap(root,20);
         root.addView(text("Your video.\nJust the audio.",34,ink,true));
-        root.addView(text("MP4 link → MP3, in a few taps.",16,muted,false));gap(root,22);
+        root.addView(text("YouTube · Instagram · MP4 → MP3",16,muted,false));gap(root,22);
         LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(20),dp(18),dp(20),dp(20));card.setBackground(bg(Color.WHITE,22));root.addView(card);
         card.addView(text("1   Paste your video link",17,ink,true));gap(card,8);
-        link=input("https://example.com/video.mp4",R.id.link_input);link.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);card.addView(link);
+        link=input("Paste a video or Reel link",R.id.link_input);link.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);card.addView(link);
         Button paste=button("Paste link",false);LinearLayout.LayoutParams pasteLp=new LinearLayout.LayoutParams(-1,dp(48));pasteLp.topMargin=dp(8);card.addView(paste,pasteLp);
         paste.setOnClickListener(v->{ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cm.hasPrimaryClip()&&cm.getPrimaryClip()!=null){CharSequence t=cm.getPrimaryClip().getItemAt(0).coerceToText(this);link.setText(t);link.setSelection(link.length());}else Toast.makeText(this,"Copy a video link first",Toast.LENGTH_SHORT).show();});
         gap(card,14);card.addView(text("2   Make it yours",17,ink,true));
@@ -50,11 +50,11 @@ public class MainActivity extends Activity {
         LinearLayout actions=new LinearLayout(this);open=button("Play MP3",true);share=button("Share",false);LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,dp(52),1);a.setMarginEnd(dp(8));actions.addView(open,a);actions.addView(share,new LinearLayout.LayoutParams(0,dp(52),1));root.addView(actions);
         open.setOnClickListener(v->useResult(false));share.setOnClickListener(v->useResult(true));
         gap(root,24);root.addView(text("No account. No uploads. Just audio.",14,ink,true));
-        root.addView(text("Use a public, direct video link. Webpage links such as YouTube or Instagram are not supported. Up to 1 GB; mono or stereo audio. Higher bitrate cannot improve a low-quality source.",12,muted,false));
+        root.addView(text("Paste a public YouTube video/Short, Instagram Reel/post, or MP4 link. Private, login-required and restricted videos may not download. Platforms can temporarily block requests. Up to 1 GB.",12,muted,false));
         TextView licenses=text("About & open-source licenses",12,purple,false);root.addView(licenses);licenses.setOnClickListener(v->{
-            String license="LAME 3.100 MP3 encoder · LGPL 2.0 or later\nhttps://lame.sourceforge.io/\n\n";
+            String license="Pocket Audio 2.0 · GPL-3.0\nVideo support: yt-dlp / youtubedl-android 0.18.1\nAudio conversion: FFmpeg\nSource: https://github.com/ahtishamite/webstorage/tree/pocket-audio-app/PocketAudio\n\nLAME 3.100 MP3 encoder · LGPL 2.0 or later\nhttps://lame.sourceforge.io/\n\n";
             try(java.io.InputStream in=getAssets().open("LAME-LICENSE.txt")){java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1)bytes.write(buf,0,n);license+=bytes.toString("UTF-8");}catch(Exception ignored){license+="License text unavailable in this build.";}
-            TextView t=text(license,13,ink,false);t.setPadding(dp(20),dp(15),dp(20),dp(15));ScrollView sv=new ScrollView(this);sv.addView(t);new AlertDialog.Builder(this).setTitle("Pocket Audio 1.0").setView(sv).setPositiveButton("Close",null).show();
+            TextView t=text(license,13,ink,false);t.setPadding(dp(20),dp(15),dp(20),dp(15));ScrollView sv=new ScrollView(this);sv.addView(t);new AlertDialog.Builder(this).setTitle("Pocket Audio 2.0").setView(sv).setPositiveButton("Close",null).show();
         });
         setContentView(scroll);
         if(b!=null){link.setText(b.getString("link",""));name.setText(b.getString("name","My audio"));quality.setSelection(b.getInt("quality",1));}
@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
     }
     private void start(){
         if(ConvertService.busy)return;
-        try{ConvertService.checkedUrl(link.getText().toString());}catch(Exception e){link.setError("Paste a valid public HTTP or HTTPS MP4 link");link.requestFocus();return;}
+        try{ConvertService.checkedUrl(link.getText().toString());}catch(Exception e){link.setError("Paste a full public video URL, including https://");link.requestFocus();return;}
         if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},5);
         Intent i=new Intent(this,ConvertService.class).putExtra("url",link.getText().toString().trim()).putExtra("name",name.getText().toString()).putExtra("bitrate",new int[]{128,192,320}[quality.getSelectedItemPosition()]);
         try{startForegroundService(i);convert.setEnabled(false);}catch(Exception e){Toast.makeText(this,"Could not start. Keep the app open and retry.",Toast.LENGTH_LONG).show();}

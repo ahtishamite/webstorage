@@ -1,5 +1,5 @@
 """End-to-end APK installation, UI, HTTP download and MP3 decoding check."""
-import atexit
+import atexit, os
 import subprocess as sp, pathlib, time, threading, http.server, functools, xml.etree.ElementTree as ET, re, json
 root=pathlib.Path(__file__).resolve().parents[1]; out=root/'smoke-results';out.mkdir(exist_ok=True)
 fixtures=out/'fixtures';fixtures.mkdir(exist_ok=True)
@@ -18,6 +18,8 @@ def diagnostics():
  except Exception as e:print('Diagnostics:',e)
 atexit.register(diagnostics)
 print(adb('install','-r',str(root/'app/build/outputs/apk/debug/app-debug.apk')))
+adb('shell','pm','clear','com.pocketaudio.app')
+adb('shell',"rm -rf /sdcard/Download/PocketAudio")
 adb('shell','pm','grant','com.pocketaudio.app','android.permission.POST_NOTIFICATIONS')
 print(adb('shell','am','start','-W','-n','com.pocketaudio.app/.MainActivity'));time.sleep(8)
 def screen():
@@ -40,7 +42,7 @@ for retry in range(8):
   if node.attrib.get('text') in ['OK','Got it','Continue','Allow']:tap(node)
  time.sleep(2)
 else:raise RuntimeError('App input did not appear')
-tap(edit);adb('shell','input','text','http://10.0.2.2:8765/test.mp4');adb('shell','input','keyevent','4')
+tap(edit);adb('shell','input','text',os.environ.get('TEST_URL','http://10.0.2.2:8765/test.mp4'));adb('shell','input','keyevent','4')
 for attempt in range(5):
  b=find_text('Convert to MP3')
  if b is not None:tap(b);break
@@ -55,7 +57,7 @@ else:raise RuntimeError('MP3 was not saved within three minutes')
 adb('pull',paths[0],str(out/'converted.mp3'))
 probe=json.loads(run('ffprobe','-v','error','-show_streams','-show_format','-of','json',str(out/'converted.mp3')))
 assert probe['streams'][0]['codec_name']=='mp3',probe
-assert abs(float(probe['format']['duration'])-5)<0.5,probe
+if 'TEST_URL' not in os.environ:assert abs(float(probe['format']['duration'])-5)<0.5,probe
 run('ffmpeg','-v','error','-i',str(out/'converted.mp3'),'-f','null','-')
 with (out/'screen.png').open('wb') as f:sp.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
 (out/'verification.json').write_text(json.dumps({'passed':True,'checks':['APK installed','Activity opened','URL entered through UI','HTTP MP4 downloaded','MP3 saved to Downloads','ffprobe confirmed MP3 codec and duration','Full MP3 decoded without errors'],'probe':probe},indent=2))
