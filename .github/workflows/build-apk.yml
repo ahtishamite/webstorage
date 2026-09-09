@@ -1,5 +1,5 @@
 name: Build installable APK
-on: [workflow_dispatch]
+on: [workflow_dispatch, pull_request]
 permissions:
   contents: read
 jobs:
@@ -50,11 +50,7 @@ jobs:
           profile: pixel_2
           working-directory: PocketAudio
           disable-animations: true
-          script: |
-            python3 scripts/smoke.py
-            cp smoke-results/verification.json smoke-results/direct-verification.json
-            TEST_URL=https://www.youtube.com/watch?v=BaW_jenozKc python3 scripts/smoke.py > smoke-results/youtube-test.log 2>&1 || echo "Live YouTube request did not complete; inspect platform response in youtube-test.log"
-            TEST_URL=https://www.instagram.com/reel/CDUMkliABpa/ python3 scripts/smoke.py > smoke-results/instagram-test.log 2>&1 || echo "Live Instagram request did not complete; inspect platform response in instagram-test.log"
+          script: python3 scripts/smoke3.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
