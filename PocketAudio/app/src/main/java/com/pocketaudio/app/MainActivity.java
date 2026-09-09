@@ -36,12 +36,12 @@ public class MainActivity extends Activity {
         root.addView(text("MP4 link → MP3, in a few taps.",16,muted,false));gap(root,22);
         LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(20),dp(18),dp(20),dp(20));card.setBackground(bg(Color.WHITE,22));root.addView(card);
         card.addView(text("1   Paste your video link",17,ink,true));gap(card,8);
-        link=input("https://example.com/video.mp4",1001);link.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);card.addView(link);
+        link=input("https://example.com/video.mp4",R.id.link_input);link.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);card.addView(link);
         Button paste=button("Paste link",false);LinearLayout.LayoutParams pasteLp=new LinearLayout.LayoutParams(-1,dp(48));pasteLp.topMargin=dp(8);card.addView(paste,pasteLp);
         paste.setOnClickListener(v->{ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cm.hasPrimaryClip()&&cm.getPrimaryClip()!=null){CharSequence t=cm.getPrimaryClip().getItemAt(0).coerceToText(this);link.setText(t);link.setSelection(link.length());}else Toast.makeText(this,"Copy a video link first",Toast.LENGTH_SHORT).show();});
         gap(card,14);card.addView(text("2   Make it yours",17,ink,true));
-        card.addView(text("File name",13,muted,false));name=input("My audio",1002);name.setText("My audio");card.addView(name);
-        gap(card,10);card.addView(text("Audio quality",13,muted,false));quality=new Spinner(this);quality.setId(1003);
+        card.addView(text("File name",13,muted,false));name=input("My audio",R.id.name_input);name.setText("My audio");card.addView(name);
+        gap(card,10);card.addView(text("Audio quality",13,muted,false));quality=new Spinner(this);quality.setId(R.id.quality_input);
         quality.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"128 kbps · Smaller file","192 kbps · Recommended","320 kbps · Higher bitrate"}));quality.setSelection(1);card.addView(quality,new LinearLayout.LayoutParams(-1,dp(50)));
         gap(card,18);convert=button("Convert to MP3",true);card.addView(convert,new LinearLayout.LayoutParams(-1,dp(56)));convert.setOnClickListener(v->start());
         gap(root,18);heading=text("Ready when you are",18,ink,true);root.addView(heading);detail=text("",14,muted,false);root.addView(detail);
