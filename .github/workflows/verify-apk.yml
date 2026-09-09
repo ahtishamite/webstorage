@@ -1,5 +1,5 @@
 name: Verify compiled APK
-on: [workflow_dispatch]
+on: [pull_request, workflow_dispatch]
 permissions:
   contents: read
   actions: read
@@ -15,7 +15,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: PocketAudio-APK
-          run-id: 34357113528
+          run-id: 34359974756
           github-token: ${{ github.token }}
           path: PocketAudio/app/build/outputs/apk/debug
       - run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
@@ -32,7 +32,7 @@ jobs:
           profile: pixel_2
           working-directory: PocketAudio
           disable-animations: true
-          script: python3 scripts/smoke.py
+          script: TEST_URL=https://www.youtube.com/watch?v=jNQXAC9IVRw python3 scripts/smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

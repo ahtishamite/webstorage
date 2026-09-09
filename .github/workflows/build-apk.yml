@@ -1,8 +1,5 @@
 name: Build installable APK
-on:
-  workflow_dispatch:
-  pull_request:
-    paths: ['PocketAudio/app/**', 'PocketAudio/build.gradle', 'PocketAudio/scripts/prepare_lame.py']
+on: [workflow_dispatch]
 permissions:
   contents: read
 jobs:

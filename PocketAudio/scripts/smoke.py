@@ -53,6 +53,9 @@ for attempt in range(90):
  files=adb('shell',"find /sdcard/Download/PocketAudio -name '*.mp3' 2>/dev/null || true") if attempt>3 else ''
  paths=[s for s in files.splitlines() if s.endswith('.mp3')]
  if paths:break
+ if attempt%8==0 and find_text('Couldn’t convert this link') is not None:
+  adb('shell','input','swipe','500','1500','500','500','300')
+  raise RuntimeError('Platform rejected request; see diagnostic screen')
 else:raise RuntimeError('MP3 was not saved within three minutes')
 adb('pull',paths[0],str(out/'converted.mp3'))
 probe=json.loads(run('ffprobe','-v','error','-show_streams','-show_format','-of','json',str(out/'converted.mp3')))
