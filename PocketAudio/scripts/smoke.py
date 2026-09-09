@@ -1,4 +1,5 @@
 """End-to-end APK installation, UI, HTTP download and MP3 decoding check."""
+import atexit
 import subprocess as sp, pathlib, time, threading, http.server, functools, xml.etree.ElementTree as ET, re, json
 root=pathlib.Path(__file__).resolve().parents[1]; out=root/'smoke-results';out.mkdir(exist_ok=True)
 fixtures=out/'fixtures';fixtures.mkdir(exist_ok=True)
@@ -7,9 +8,18 @@ def adb(*args):return run('adb',*args)
 run('ffmpeg','-y','-f','lavfi','-i','color=c=blue:s=320x240:d=5','-f','lavfi','-i','sine=frequency=440:duration=5','-c:v','mpeg4','-c:a','aac','-ac','2','-shortest',str(fixtures/'test.mp4'))
 server=http.server.ThreadingHTTPServer(('0.0.0.0',8765),functools.partial(http.server.SimpleHTTPRequestHandler,directory=str(fixtures)))
 threading.Thread(target=server.serve_forever,daemon=True).start()
-adb('install','-r',str(root/'app/build/outputs/apk/debug/app-debug.apk'))
+def diagnostics():
+ try:
+  (out/'logcat.txt').write_text(adb('logcat','-d','-s','AndroidRuntime:E'))
+  adb('shell','uiautomator','dump','/sdcard/diagnostic.xml')
+  xml=adb('shell','cat','/sdcard/diagnostic.xml');(out/'screen.xml').write_text(xml);print(xml)
+  print((out/'logcat.txt').read_text())
+  with (out/'diagnostic.png').open('wb') as f:sp.run(['adb','exec-out','screencap','-p'],stdout=f)
+ except Exception as e:print('Diagnostics:',e)
+atexit.register(diagnostics)
+print(adb('install','-r',str(root/'app/build/outputs/apk/debug/app-debug.apk')))
 adb('shell','pm','grant','com.pocketaudio.app','android.permission.POST_NOTIFICATIONS')
-adb('shell','am','start','-W','-n','com.pocketaudio.app/.MainActivity');time.sleep(3)
+print(adb('shell','am','start','-W','-n','com.pocketaudio.app/.MainActivity'));time.sleep(8)
 def screen():
  adb('shell','uiautomator','dump','/sdcard/window.xml')
  return ET.fromstring(adb('shell','cat','/sdcard/window.xml'))
@@ -17,7 +27,14 @@ def tap(node):
  a=list(map(int,re.findall(r'\d+',node.attrib['bounds'])));adb('shell','input','tap',str((a[0]+a[2])//2),str((a[1]+a[3])//2))
 def find_text(s):
  return next((n for n in screen().iter('node') if n.attrib.get('text')==s),None)
-tree=screen();edit=next(n for n in tree.iter('node') if n.attrib.get('class')=='android.widget.EditText')
+for retry in range(8):
+ tree=screen();edit=next((n for n in tree.iter('node') if n.attrib.get('class')=='android.widget.EditText'),None)
+ if edit is not None:break
+ print(ET.tostring(tree,encoding='unicode'))
+ for node in tree.iter('node'):
+  if node.attrib.get('text') in ['OK','Got it','Continue','Allow']:tap(node)
+ time.sleep(2)
+else:raise RuntimeError('App input did not appear')
 tap(edit);adb('shell','input','text','http://10.0.2.2:8765/test.mp4');adb('shell','input','keyevent','4')
 for attempt in range(5):
  b=find_text('Convert to MP3')
