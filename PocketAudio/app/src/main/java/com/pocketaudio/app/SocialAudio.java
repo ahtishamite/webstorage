@@ -14,22 +14,35 @@ import kotlin.Unit;
 final class SocialAudio {
     interface Progress { void update(String title,String message,int percent); boolean cancelled(); }
     static final String PROCESS="pocket-audio";
+    private static volatile boolean ready;
+    static volatile boolean updating;
+    static volatile String updateStatus="Update only if a supported link stops working.";
+    private static synchronized void initialize(Context c) throws Exception {
+        if(ready)return;
+        YoutubeDL.getInstance().init(c.getApplicationContext());
+        FFmpeg.getInstance().init(c.getApplicationContext());
+        ready=true;
+    }
+    static void warmUp(Context c){new Thread(()->{try{initialize(c);}catch(Exception|LinkageError ignored){}},"media-warmup").start();}
+    static synchronized boolean requestUpdate(Context c){
+        if(updating||ConvertService.busy)return false;
+        updating=true;updateStatus="Updating video support…";
+        new Thread(()->{
+            try{initialize(c);YoutubeDL.getInstance().updateYoutubeDL(c,YoutubeDL.UpdateChannel._STABLE);
+                updateStatus="Video support is up to date.";
+            }catch(Exception|LinkageError e){updateStatus="Update unavailable. Your installed video support is still usable.";}
+            finally{updating=false;}
+        },"media-support-update").start();return true;
+    }
     static void cancel(){new Thread(()->{try{YoutubeDL.getInstance().destroyProcessById(PROCESS);}catch(Exception ignored){}},"cancel-extractor").start();}
     static void convert(Context c,String url,File output,int bitrate,boolean video,int height,Progress p) throws Exception {
         File work=new File(c.getCacheDir(),"social-"+System.nanoTime());
         if(!work.mkdirs())throw new IOException("Could not create temporary storage.");
         try {
-            p.update("Preparing video tools","First use may take a little longer.",-1);
-            YoutubeDL.getInstance().init(c);
-            FFmpeg.getInstance().init(c);
+            p.update(ready?"Reading video link":"Preparing video tools",ready?"Connecting to the video platform…":"Preparing tools on this phone. First use takes longer.",-1);
+            initialize(c);
             if(p.cancelled())throw new CancellationException();
-            long last=c.getSharedPreferences("engine",Context.MODE_PRIVATE).getLong("checked",0);
-            if(System.currentTimeMillis()-last>86400000L){
-                p.update("Checking video support","Checking for updated YouTube and Instagram support…",-1);
-                try{YoutubeDL.getInstance().updateYoutubeDL(c,YoutubeDL.UpdateChannel._STABLE);c.getSharedPreferences("engine",0).edit().putLong("checked",System.currentTimeMillis()).apply();}catch(Exception ignored){}
-            }
-            if(p.cancelled())throw new CancellationException();
-            p.update("Reading video link","Finding audio from your video…",-1);
+            p.update("Reading video link","Connecting to the video platform…",-1);
             YoutubeDLRequest r=new YoutubeDLRequest(url);
             r.addOption("--no-playlist");r.addOption("--playlist-items","1");
             r.addOption("--socket-timeout","20");r.addOption("--retries","2");r.addOption("--extractor-retries","2");
@@ -43,8 +56,11 @@ final class SocialAudio {
             r.addOption("--fragment-retries","3");r.addOption("--concurrent-fragments","2");
             r.addOption("-o",new File(work,"audio.%(ext)s").getAbsolutePath());
             YoutubeDL.getInstance().execute(r,PROCESS,(progress,eta,line)->{
-                boolean encoding=line.contains("ExtractAudio")||line.contains("ffmpeg");
-                p.update(encoding?(video?"Merging video and audio":"Converting to MP3"):(video?"Downloading video":"Downloading audio"),encoding?"Finishing your media on this phone.":"You can leave this screen while the download finishes.",encoding?94:Math.min(90,Math.max(1,(int)(progress*0.9f))));
+                boolean encoding=line.contains("ExtractAudio")||line.contains("Merger")||line.contains("VideoRemuxer")||line.contains("ffmpeg");
+                boolean downloading=line.contains("[download]") && progress>=0;
+                if(encoding)p.update(video?"Finishing MP4":"Converting to MP3","Processing your media on this phone.",94);
+                else if(downloading)p.update(video?"Downloading video":"Downloading audio","Keep a stable connection. You can switch tabs.",Math.min(90,Math.max(1,(int)(progress*0.9f))));
+                else if(line.contains("[info]"))p.update("Selecting your quality","The best available match is being prepared.",-1);
                 return Unit.INSTANCE;
             });
             if(p.cancelled())throw new CancellationException();

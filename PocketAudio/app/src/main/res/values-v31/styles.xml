@@ -1,0 +1,6 @@
+<resources><style name="AppTheme.Starting" parent="AppTheme">
+<item name="android:windowSplashScreenBackground">#D9F5F4</item>
+<item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_drop</item>
+<item name="android:windowSplashScreenIconBackgroundColor">#D9F5F4</item>
+<item name="android:windowSplashScreenBrandingImage">@drawable/splash_brand</item>
+</style></resources>

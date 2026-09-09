@@ -13,6 +13,7 @@ import org.json.*;
 public class ConvertService extends Service {
  static volatile boolean busy=false;
  static volatile int progress=0;
+ static volatile long startedAt;
  static volatile String status="Ready to download",detail="Paste a public video link.",resultMime="audio/mpeg";
  static volatile Uri result;
  private volatile boolean cancelled;
@@ -25,8 +26,9 @@ public class ConvertService extends Service {
  public int onStartCommand(Intent i,int flags,int id){
   if(i!=null&&"cancel".equals(i.getAction())){cancel();return START_NOT_STICKY;}
   if(busy)return START_NOT_STICKY;
+  if(SocialAudio.updating){status="Video support is updating";detail="Please wait, then tap Download again.";stopSelf();return START_NOT_STICKY;}
   if(i==null){stopSelf();return START_NOT_STICKY;}
-  busy=true;cancelled=false;storageError=null;result=null;status="Starting download";detail="Preparing your media…";progress=-1;
+  startedAt=SystemClock.elapsedRealtime();busy=true;cancelled=false;storageError=null;result=null;status="Starting download";detail="Preparing your media…";progress=-1;
   startForeground(7,notification());
   wake=((PowerManager)getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"PocketMedia:download");wake.acquire(6*60*60*1000L);
   String url=i.getStringExtra("url"),name=i.getStringExtra("name");int bitrate=i.getIntExtra("bitrate",192),height=i.getIntExtra("height",1080);boolean video=i.getBooleanExtra("video",false);

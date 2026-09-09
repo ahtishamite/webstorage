@@ -4,92 +4,150 @@ import android.Manifest;
 import android.app.*;
 import android.content.*;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.content.res.ColorStateList;
+import android.graphics.*;
+import android.graphics.drawable.*;
 import android.net.Uri;
 import android.os.*;
 import android.view.*;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
+import org.json.*;
 
 public class MainActivity extends Activity {
-    private final int ink=Color.rgb(31,29,54), muted=Color.rgb(111,107,132), purple=Color.rgb(87,70,217);
-    private EditText link,name;private Spinner quality,mode;private Button convert,cancel,open,share;
-    private TextView heading,detail;private ProgressBar progress;
+    private final int ink=0xFF172F44,muted=0xFF536C80,accent=0xFF006E83;
+    private EditText link,name;
+    private Spinner mode,quality;
+    private Button convert,cancel,update;
+    private TextView heading,detail,updateDetail;
+    private ProgressBar progress;
+    private LinearLayout historyList;
+    private FrameLayout pages;
+    private View[] screens;
+    private Button[] tabs;
+    private int selectedTab,lastMode=-1,pendingQuality=-1;
+    private boolean pendingStart;
+    private long pressedAt;
+    private String historyVersion="";
     private final Handler handler=new Handler(Looper.getMainLooper());
-    private final Runnable refresh=new Runnable(){public void run(){render();handler.postDelayed(this,400);}};
+    private final Runnable refresh=new Runnable(){public void run(){render();handler.postDelayed(this,300);}};
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
-    private GradientDrawable bg(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
-    private TextView text(String value,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);t.setPadding(0,dp(5),0,dp(5));return t;}
-    private void gap(LinearLayout l,int size){Space s=new Space(this);l.addView(s,new LinearLayout.LayoutParams(1,dp(size)));}
-    private Button button(String label,boolean primary){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(16);b.setTextColor(primary?Color.WHITE:purple);b.setBackground(bg(primary?purple:0xFFECE9FC,14));b.setMinHeight(dp(52));return b;}
-    private EditText input(String hint,int id){EditText e=new EditText(this);e.setId(id);e.setHint(hint);e.setTextColor(ink);e.setTextSize(16);e.setHintTextColor(muted);e.setSingleLine(true);e.setPadding(dp(15),dp(14),dp(15),dp(14));e.setBackground(bg(0xFFF2F1F8,12));return e;}
-    public void onCreate(Bundle b){
-        super.onCreate(b);
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(0xFFF7F6FC);
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(24),dp(18),dp(24),dp(24));scroll.addView(root);
-        if(Build.VERSION.SDK_INT>=30) root.setOnApplyWindowInsetsListener((v,insets)->{android.graphics.Insets i=insets.getInsets(WindowInsets.Type.systemBars());v.setPadding(dp(24)+i.left,dp(18)+i.top,dp(24)+i.right,dp(24)+i.bottom);return insets;});
-        // API 29 fallback: fitsSystemWindows handles insets below Android 11.
-        if(Build.VERSION.SDK_INT<30){root.setOnApplyWindowInsetsListener(null);root.setFitsSystemWindows(true);}
-        root.addView(text("POCKET MEDIA",13,purple,true));gap(root,20);
-        root.addView(text("Save the video.\nKeep the audio.",28,ink,true));
-        root.addView(text("Video & audio downloads · Up to 8K",16,muted,false));gap(root,22);
-        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(20),dp(18),dp(20),dp(20));card.setBackground(bg(Color.WHITE,22));root.addView(card);
-        card.addView(text("1   Paste your video link",17,ink,true));gap(card,8);
-        link=input("Paste a video or Reel link",R.id.link_input);link.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);card.addView(link);
-        Button paste=button("Paste link",false);LinearLayout.LayoutParams pasteLp=new LinearLayout.LayoutParams(-1,dp(48));pasteLp.topMargin=dp(8);card.addView(paste,pasteLp);
-        paste.setOnClickListener(v->{ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cm.hasPrimaryClip()&&cm.getPrimaryClip()!=null){CharSequence t=cm.getPrimaryClip().getItemAt(0).coerceToText(this);link.setText(t);link.setSelection(link.length());}else Toast.makeText(this,"Copy a video link first",Toast.LENGTH_SHORT).show();});
-        gap(card,14);card.addView(text("2   Choose your download",17,ink,true));
-        mode=new Spinner(this);mode.setId(R.id.mode_input);mode.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Audio · MP3","Video · MP4"}));card.addView(mode,new LinearLayout.LayoutParams(-1,dp(50)));
-        card.addView(text("File name",13,muted,false));name=input("My media",R.id.name_input);name.setText("My media");card.addView(name);
-        gap(card,10);card.addView(text("Quality",13,muted,false));quality=new Spinner(this);quality.setId(R.id.quality_input);
-        quality.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"128 kbps · Smaller file","192 kbps · Recommended","320 kbps · Higher bitrate"}));quality.setSelection(1);card.addView(quality,new LinearLayout.LayoutParams(-1,dp(50)));
-        mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
-            public void onNothingSelected(AdapterView<?> a){}
-            public void onItemSelected(AdapterView<?> a,View v,int position,long id){setQualities(position==1);}
-        });
-        card.addView(text("Video quality uses the best available source up to your selection. 60 fps is preferred when available. No artificial upscaling. High-resolution playback depends on your phone.",12,muted,false));
-        gap(card,18);convert=button("Download MP3",true);card.addView(convert,new LinearLayout.LayoutParams(-1,dp(56)));convert.setOnClickListener(v->start());
-        gap(root,18);heading=text("Ready when you are",18,ink,true);root.addView(heading);detail=text("",14,muted,false);root.addView(detail);
-        progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(purple));root.addView(progress,new LinearLayout.LayoutParams(-1,dp(8)));
-        gap(root,12);cancel=button("Cancel download",false);root.addView(cancel);cancel.setOnClickListener(v->startService(new Intent(this,ConvertService.class).setAction("cancel")));
-        LinearLayout actions=new LinearLayout(this);open=button("Open file",true);share=button("Share",false);LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,dp(52),1);a.setMarginEnd(dp(8));actions.addView(open,a);actions.addView(share,new LinearLayout.LayoutParams(0,dp(52),1));root.addView(actions);
-        open.setOnClickListener(v->useResult(false));share.setOnClickListener(v->useResult(true));
-        gap(root,24);root.addView(text("No account. Saved on your phone.",14,ink,true));
-        root.addView(text("Paste a public YouTube video/Short, Instagram Reel/post, or MP4 link. Private, login-required and restricted videos may not download. Platforms can temporarily block requests. Videos appear in Gallery / Movies; audio is in Music / PocketMedia. Available storage limits large downloads.",12,muted,false));
-        TextView licenses=text("About & open-source licenses",12,purple,false);root.addView(licenses);licenses.setOnClickListener(v->{
-            String license="Pocket Media 3.0 · GPL-3.0\nVideo support: yt-dlp / youtubedl-android 0.18.1\nAudio conversion: FFmpeg\nSource: https://github.com/ahtishamite/webstorage/tree/pocket-audio-app/PocketAudio\n\nLAME 3.100 MP3 encoder · LGPL 2.0 or later\nhttps://lame.sourceforge.io/\n\n";
-            try(java.io.InputStream in=getAssets().open("LAME-LICENSE.txt")){java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1)bytes.write(buf,0,n);license+=bytes.toString("UTF-8");}catch(Exception ignored){license+="License text unavailable in this build.";}
-            TextView t=text(license,13,ink,false);t.setPadding(dp(20),dp(15),dp(20),dp(15));ScrollView sv=new ScrollView(this);sv.addView(t);new AlertDialog.Builder(this).setTitle("Pocket Media 3.0").setView(sv).setPositiveButton("Close",null).show();
-        });
-        Button history=button("Recent downloads",false);root.addView(history);history.setOnClickListener(v->showHistory());
-        setContentView(scroll);
-        if(b==null)receiveSharedLink(getIntent());
-        if(b!=null){mode.setSelection(b.getInt("mode",0));link.setText(b.getString("link",""));name.setText(b.getString("name","My audio"));}
-        if(!ConvertService.busy && ConvertService.result==null){String last=getSharedPreferences("audio",MODE_PRIVATE).getString("last",null);if(last!=null){ConvertService.result=Uri.parse(last);ConvertService.resultMime=getSharedPreferences("audio",0).getString("mime","audio/mpeg");ConvertService.status="Your last download";ConvertService.detail=getSharedPreferences("audio",MODE_PRIVATE).getString("filename","")+"";}}
+    private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
+    private GradientDrawable shape(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
+    private Drawable glass(int radius,boolean bright){
+        GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{bright?0xEDFFFFFF:0xC2FFFFFF,bright?0xB8F4FFFF:0x75FFFFFF});
+        g.setCornerRadius(dp(radius));g.setStroke(dp(1),0xE6FFFFFF);return g;
     }
-    private void setQualities(boolean video){
-        String[] q=video?new String[]{"Best available · Up to 8K","720p HD","1080p Full HD","1080p · 60 fps preferred","4K · Up to 2160p","6K · Up to 3240p","8K · Up to 4320p"}:new String[]{"128 kbps · Smaller file","192 kbps · Recommended","320 kbps · Higher bitrate"};
-        quality.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,q));quality.setSelection(video?2:1);
+    private Drawable ripple(Drawable d,int radius){return new RippleDrawable(ColorStateList.valueOf(0x22006E83),d,shape(Color.WHITE,radius));}
+    private TextView text(String value,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setFontFeatureSettings("kern");if(bold)t.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));return t;}
+    private void gap(LinearLayout l,int h){l.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(h)));}
+    private Button button(String value,boolean primary){Button b=new Button(this);b.setText(value);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(primary?Color.WHITE:accent);b.setTypeface(Typeface.create("sans-serif-medium",0));b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setPadding(dp(12),0,dp(12),0);
+        Drawable d=glass(18,true);if(primary){GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF008B9C,0xFF3462C0});g.setCornerRadius(dp(18));d=g;}
+        b.setBackground(ripple(d,18));return b;}
+    private EditText input(String hint,int id){EditText e=new EditText(this);e.setId(id);e.setHint(hint);e.setTextColor(ink);e.setHintTextColor(muted);e.setTextSize(15);e.setSingleLine(true);e.setPadding(dp(13),0,dp(13),0);e.setBackground(ripple(glass(14,false),14));return e;}
+    private LinearLayout card(){LinearLayout l=column();l.setPadding(dp(16),dp(16),dp(16),dp(16));l.setBackground(glass(24,true));l.setElevation(dp(2));return l;}
+    private ScrollView scrolling(View child){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.setClipToPadding(false);s.setPadding(dp(20),dp(6),dp(20),dp(12));s.setVerticalScrollBarEnabled(false);s.addView(child);return s;}
+    public void onCreate(Bundle state){
+        setTheme(R.style.AppTheme);super.onCreate(state);
+        if(Build.VERSION.SDK_INT>=31)getSplashScreen().setOnExitAnimationListener(s->{if(android.animation.ValueAnimator.areAnimatorsEnabled())s.animate().alpha(0).setDuration(180).withEndAction(s::remove).start();else s.remove();});
+        SocialAudio.warmUp(getApplicationContext());
+        getWindow().setStatusBarColor(Color.TRANSPARENT);getWindow().setNavigationBarColor(0xFFDCECFA);
+        FrameLayout scene=new FrameLayout(this);scene.addView(new WaterBackground(this),new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout root=column();scene.addView(root,new FrameLayout.LayoutParams(-1,-1));
+        if(Build.VERSION.SDK_INT>=30)root.setOnApplyWindowInsetsListener((v,i)->{Insets bars=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);return i;});
+        else root.setFitsSystemWindows(true);
+        LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);brand.setPadding(dp(22),dp(7),dp(22),dp(7));
+        ImageView logo=new ImageView(this);logo.setImageResource(R.drawable.ic_drop);brand.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(38)));
+        TextView title=text("  Pocket Media",20,ink,true);brand.addView(title,new LinearLayout.LayoutParams(0,dp(38),1));title.setGravity(Gravity.CENTER_VERTICAL);
+        TextView badge=text("ON DEVICE",10,accent,true);badge.setPadding(dp(10),dp(7),dp(10),dp(7));badge.setBackground(glass(20,false));brand.addView(badge);root.addView(brand,new LinearLayout.LayoutParams(-1,dp(60)));
+        pages=new FrameLayout(this);root.addView(pages,new LinearLayout.LayoutParams(-1,0,1));
+        screens=new View[]{buildHome(),buildHistory(),buildSettings()};for(View s:screens)pages.addView(s,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout nav=new LinearLayout(this);nav.setPadding(dp(5),dp(5),dp(5),dp(5));nav.setBackground(glass(28,true));nav.setElevation(dp(5));
+        tabs=new Button[3];String[] names={"↓  Download","▤  Recent","⚙  Settings"};
+        for(int j=0;j<3;j++){final int index=j;tabs[j]=button(names[j],false);tabs[j].setTextSize(13);nav.addView(tabs[j],new LinearLayout.LayoutParams(0,dp(48),1));tabs[j].setOnClickListener(v->selectTab(index,true));}
+        LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,dp(58));navLp.setMargins(dp(16),dp(4),dp(16),dp(10));root.addView(nav,navLp);
+        setContentView(scene);
+        SharedPreferences prefs=getSharedPreferences("draft",0);int savedMode=state!=null?state.getInt("mode"):prefs.getInt("mode",0);
+        pendingQuality=state!=null?state.getInt("quality",savedMode==1?2:1):prefs.getInt("quality",savedMode==1?2:1);
+        mode.setSelection(savedMode);setQualities(savedMode);
+        link.setText(state!=null?state.getString("link",""):prefs.getString("link",""));name.setText(state!=null?state.getString("name","My media"):prefs.getString("name","My media"));
+        selectTab(state!=null?state.getInt("tab",0):0,false);
+        if(state==null)receiveSharedLink(getIntent());
+        render();
     }
-    protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);receiveSharedLink(intent);}
-    private void receiveSharedLink(Intent i){if(Intent.ACTION_SEND.equals(i.getAction())&&i.hasExtra(Intent.EXTRA_TEXT))link.setText(i.getStringExtra(Intent.EXTRA_TEXT));}
-    private void showHistory(){
-        try{org.json.JSONArray a=new org.json.JSONArray(getSharedPreferences("audio",0).getString("history","[]"));if(a.length()==0){Toast.makeText(this,"Your saved downloads will appear here.",Toast.LENGTH_SHORT).show();return;}
-        String[] names=new String[a.length()];for(int j=0;j<a.length();j++)names[j]=a.getJSONObject(j).getString("name");
-        new AlertDialog.Builder(this).setTitle("Recent downloads").setItems(names,(d,index)->{try{org.json.JSONObject item=a.getJSONObject(index);ConvertService.result=Uri.parse(item.getString("uri"));ConvertService.resultMime=item.getString("mime");new AlertDialog.Builder(this).setTitle(item.getString("name")).setItems(new String[]{"Open","Share"},(dialog,action)->useResult(action==1)).show();}catch(Exception ignored){}}).setNegativeButton("Close",null).show();
-        }catch(Exception e){Toast.makeText(this,"History unavailable",Toast.LENGTH_SHORT).show();}
+    private View buildHome(){
+        LinearLayout home=column();TextView title=text("A link. A little magic.",25,ink,true);home.addView(title);gap(home,5);home.addView(text("Your favourite moments, saved.",13,muted,false));gap(home,16);
+        LinearLayout c=card();home.addView(c);
+        c.addView(text("VIDEO LINK",10,accent,true));gap(c,7);
+        LinearLayout row=new LinearLayout(this);link=input("Paste your video link",R.id.link_input);link.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);row.addView(link,new LinearLayout.LayoutParams(0,dp(48),1));
+        Button paste=button("Paste",false);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(72),dp(48));p.setMarginStart(dp(6));row.addView(paste,p);c.addView(row);
+        paste.setOnClickListener(v->{if(ConvertService.busy||pendingStart)return;ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(cm.hasPrimaryClip()&&cm.getPrimaryClip()!=null){link.setText(cm.getPrimaryClip().getItemAt(0).coerceToText(this));link.setSelection(link.length());}else Toast.makeText(this,"Copy a video link first",Toast.LENGTH_SHORT).show();});
+        gap(c,13);LinearLayout labels=new LinearLayout(this);labels.addView(text("FORMAT",10,accent,true),new LinearLayout.LayoutParams(0,-2,1));labels.addView(text("QUALITY",10,accent,true),new LinearLayout.LayoutParams(0,-2,1));c.addView(labels);gap(c,5);
+        LinearLayout choices=new LinearLayout(this);mode=new Spinner(this);mode.setId(R.id.mode_input);mode.setBackground(ripple(glass(14,false),14));mode.setAdapter(adapter(new String[]{"Audio · MP3","Video · MP4"}));quality=new Spinner(this);quality.setId(R.id.quality_input);quality.setBackground(ripple(glass(14,false),14));
+        LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(0,dp(48),1);mp.setMarginEnd(dp(7));choices.addView(mode,mp);choices.addView(quality,new LinearLayout.LayoutParams(0,dp(48),1));c.addView(choices);
+        mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> a){}public void onItemSelected(AdapterView<?> a,View v,int pos,long id){setQualities(pos);}});
+        gap(c,13);c.addView(text("FILE NAME",10,accent,true));gap(c,5);name=input("My media",R.id.name_input);c.addView(name,new LinearLayout.LayoutParams(-1,dp(44)));
+        gap(c,10);c.addView(text("Best available quality up to your selection.",11,muted,false));gap(c,13);
+        convert=button("Download MP3",true);convert.setId(R.id.download_button);c.addView(convert,new LinearLayout.LayoutParams(-1,dp(52)));convert.setOnClickListener(v->start());
+        gap(home,15);heading=text("Ready when you are",15,ink,true);home.addView(heading);gap(home,4);detail=text("MP3 to Music · MP4 to Gallery",12,muted,false);detail.setMaxLines(2);detail.setEllipsize(android.text.TextUtils.TruncateAt.END);home.addView(detail);
+        heading.setOnClickListener(v->{if(ConvertService.result!=null&&!ConvertService.busy)selectTab(1,true);});
+        detail.setOnClickListener(v->{if(!ConvertService.detail.isEmpty())new AlertDialog.Builder(this).setTitle(ConvertService.status).setMessage(ConvertService.detail).setPositiveButton("OK",null).show();});
+        gap(home,8);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setProgressTintList(ColorStateList.valueOf(accent));home.addView(progress,new LinearLayout.LayoutParams(-1,dp(5)));
+        cancel=button("Cancel download",false);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,dp(48));cp.topMargin=dp(7);home.addView(cancel,cp);cancel.setOnClickListener(v->{startService(new Intent(this,ConvertService.class).setAction("cancel"));cancel.setEnabled(false);cancel.setText("Cancelling…");});
+        return scrolling(home);
     }
-    private void start(){
-        if(ConvertService.busy)return;
-        try{link.setText(ConvertService.normalize(link.getText().toString()));}catch(Exception e){link.setError("Paste a full public video URL, including https://");link.requestFocus();return;}
-        if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},5);
-        Intent i=new Intent(this,ConvertService.class).putExtra("url",link.getText().toString().trim()).putExtra("name",name.getText().toString()).putExtra("video",mode.getSelectedItemPosition()==1).putExtra("height",mode.getSelectedItemPosition()==1?new int[]{4320,720,1080,1080,2160,3240,4320}[quality.getSelectedItemPosition()]:1080).putExtra("bitrate",mode.getSelectedItemPosition()==0?new int[]{128,192,320}[quality.getSelectedItemPosition()]:192);
-        try{startForegroundService(i);convert.setEnabled(false);}catch(Exception e){Toast.makeText(this,"Could not start. Keep the app open and retry.",Toast.LENGTH_LONG).show();}
+    private ArrayAdapter<String> adapter(String[] values){return new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,values){
+        public View getView(int pos,View view,android.view.ViewGroup parent){TextView t=(TextView)super.getView(pos,view,parent);t.setTextSize(13);t.setTextColor(ink);t.setSingleLine();t.setEllipsize(android.text.TextUtils.TruncateAt.END);t.setPadding(dp(10),0,dp(5),0);return t;}
+        public View getDropDownView(int pos,View view,android.view.ViewGroup parent){TextView t=(TextView)super.getDropDownView(pos,view,parent);t.setTextColor(ink);t.setTextSize(15);t.setPadding(dp(16),dp(14),dp(16),dp(14));return t;}
+    };}
+    private void setQualities(int selected){if(lastMode==selected)return;lastMode=selected;
+        String[] q=selected==1?new String[]{"Best · Up to 8K","720p HD","1080p Full HD","1080p · 60 fps","4K · 2160p","6K · 3240p","8K · 4320p"}:new String[]{"128 kbps","192 kbps","320 kbps"};
+        quality.setAdapter(adapter(q));quality.setSelection(pendingQuality>=0?Math.min(pendingQuality,q.length-1):(selected==1?2:1));pendingQuality=-1;
     }
-    private void render(){boolean b=ConvertService.busy;convert.setEnabled(!b);link.setEnabled(!b);name.setEnabled(!b);quality.setEnabled(!b);mode.setEnabled(!b);convert.setText(b?"Downloading…":(mode.getSelectedItemPosition()==1?"Download MP4":"Download MP3"));heading.setText(ConvertService.status);detail.setText(ConvertService.detail);progress.setVisibility(b?View.VISIBLE:View.GONE);progress.setIndeterminate(ConvertService.progress<0);if(ConvertService.progress>=0)progress.setProgress(ConvertService.progress);cancel.setVisibility(b?View.VISIBLE:View.GONE);boolean done=!b&&ConvertService.result!=null;open.setVisibility(done?View.VISIBLE:View.GONE);share.setVisibility(done?View.VISIBLE:View.GONE);}
-    private void useResult(boolean sharing){Uri u=ConvertService.result;if(u==null)return;try{Intent i=new Intent(sharing?Intent.ACTION_SEND:Intent.ACTION_VIEW);if(sharing){i.setType(ConvertService.resultMime);i.putExtra(Intent.EXTRA_STREAM,u);i.setClipData(ClipData.newRawUri("MP3 audio",u));}else i.setDataAndType(u,ConvertService.resultMime);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,sharing?"Share media":"Open media"));}catch(Exception e){Toast.makeText(this,"Open Movies / PocketMedia or Music / PocketMedia in your Files app.",Toast.LENGTH_LONG).show();}}
+    private View buildHistory(){LinearLayout l=column();l.addView(text("Your collection",26,ink,true));gap(l,5);l.addView(text("Recent downloads · Always on your phone",13,muted,false));gap(l,18);historyList=column();l.addView(historyList);return scrolling(l);}
+    private void refreshHistory(){String value=getSharedPreferences("audio",0).getString("history","[]");if(value.equals(historyVersion))return;historyVersion=value;historyList.removeAllViews();
+        try{JSONArray items=new JSONArray(value);if(items.length()==0){LinearLayout empty=card();empty.setPadding(dp(22),dp(36),dp(22),dp(36));empty.addView(text("Your first save starts here",20,ink,true));gap(empty,10);empty.addView(text("Download a video or audio track. It will appear here, ready to open or share.",14,muted,false));gap(empty,20);Button back=button("Download something",true);empty.addView(back);back.setOnClickListener(v->selectTab(0,true));historyList.addView(empty);}
+            for(int j=0;j<items.length();j++){JSONObject item=items.getJSONObject(j);Uri uri=Uri.parse(item.getString("uri"));String mime=item.getString("mime");LinearLayout c=card();historyList.addView(c);c.addView(text(mime.startsWith("video")?"MP4  ·  VIDEO":"MP3  ·  AUDIO",10,accent,true));gap(c,7);TextView filename=text(item.getString("name"),15,ink,true);filename.setMaxLines(2);filename.setEllipsize(android.text.TextUtils.TruncateAt.END);c.addView(filename);gap(c,5);c.addView(text(item.optString("info","Saved on your phone"),12,muted,false));gap(c,12);LinearLayout actions=new LinearLayout(this);Button open=button("Open",true),share=button("Share",false);LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,dp(48),1);a.setMarginEnd(dp(8));actions.addView(open,a);actions.addView(share,new LinearLayout.LayoutParams(0,dp(48),1));c.addView(actions);open.setOnClickListener(v->useMedia(uri,mime,false));share.setOnClickListener(v->useMedia(uri,mime,true));gap(historyList,12);}
+        }catch(JSONException e){historyList.addView(text("Could not read recent downloads. Your files are still in Music and Movies / PocketMedia.",14,muted,false));}}
+    private View buildSettings(){LinearLayout l=column();l.addView(text("Make it yours",26,ink,true));gap(l,5);l.addView(text("Simple tools. No account needed.",13,muted,false));gap(l,18);
+        LinearLayout c=card();l.addView(c);c.addView(text("Video support",18,ink,true));gap(c,8);c.addView(text("Downloads use the installed tools immediately. Check for an update here if a public link stops working.",13,muted,false));gap(c,14);update=button("Update video support",true);c.addView(update,new LinearLayout.LayoutParams(-1,dp(48)));updateDetail=text(SocialAudio.updateStatus,12,muted,false);gap(c,10);c.addView(updateDetail);update.setOnClickListener(v->{if(!SocialAudio.requestUpdate(getApplicationContext()))Toast.makeText(this,"Finish the current download or update first.",Toast.LENGTH_SHORT).show();render();});
+        gap(l,14);LinearLayout storage=card();l.addView(storage);storage.addView(text("Saved where you need it",18,ink,true));gap(storage,8);storage.addView(text("Videos → Gallery / Movies / PocketMedia\nAudio → Music / PocketMedia\n\nUp to 8K, with 60 fps preferred when available. Quality depends on the original video; playback depends on your phone.\n\nPrivate, login-required and protected videos may not download. Platforms may also limit requests.",13,muted,false));
+        gap(l,16);Button about=button("About & open-source licenses",false);l.addView(about);about.setOnClickListener(v->about());gap(l,10);l.addView(text("POCKET MEDIA 4.0  ·  LIQUID",11,muted,true));return scrolling(l);}
+    private void selectTab(int index,boolean animate){selectedTab=Math.max(0,Math.min(2,index));for(int j=0;j<3;j++){screens[j].setVisibility(j==selectedTab?View.VISIBLE:View.GONE);tabs[j].setTextColor(j==selectedTab?Color.WHITE:muted);tabs[j].setBackground(ripple(j==selectedTab?shape(accent,23):shape(Color.TRANSPARENT,23),23));tabs[j].setSelected(j==selectedTab);}if(selectedTab==1)refreshHistory();
+        if(animate){((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(link.getWindowToken(),0);if(android.animation.ValueAnimator.areAnimatorsEnabled()){View active=screens[selectedTab];active.animate().cancel();active.setAlpha(0.6f);active.animate().alpha(1).setDuration(140).start();}}}
+    private void start(){if(ConvertService.busy||pendingStart||SocialAudio.updating)return;
+        try{link.setText(ConvertService.normalize(link.getText().toString()));}catch(Exception e){link.setError("Paste a full public video URL");link.requestFocus();return;}
+        ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(link.getWindowToken(),0);link.clearFocus();name.clearFocus();
+        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},5);
+        boolean video=mode.getSelectedItemPosition()==1;int q=quality.getSelectedItemPosition();
+        Intent i=new Intent(this,ConvertService.class).putExtra("url",link.getText().toString().trim()).putExtra("name",name.getText().toString()).putExtra("video",video).putExtra("height",video?new int[]{4320,720,1080,1080,2160,3240,4320}[q]:1080).putExtra("bitrate",video?192:new int[]{128,192,320}[q]);
+        pendingStart=true;pressedAt=SystemClock.elapsedRealtime();render();
+        try{startForegroundService(i);}catch(Exception e){pendingStart=false;render();Toast.makeText(this,"Could not start. Keep the app open and retry.",Toast.LENGTH_LONG).show();}}
+    private void render(){if(convert==null)return;boolean b=ConvertService.busy;if(b||SystemClock.elapsedRealtime()-pressedAt>4000)pendingStart=false;boolean working=b||pendingStart;
+        convert.setEnabled(!working&&!SocialAudio.updating);link.setEnabled(!working);name.setEnabled(!working);quality.setEnabled(!working);mode.setEnabled(!working);convert.setText(working?"Working…":SocialAudio.updating?"Updating tools…":mode.getSelectedItemPosition()==1?"Download MP4":"Download MP3");
+        heading.setText(pendingStart?"Starting now…":ConvertService.result!=null&&!b?"Saved · View in Recent":ConvertService.status);
+        String d=ConvertService.detail;if(b){long seconds=(SystemClock.elapsedRealtime()-ConvertService.startedAt)/1000;d=seconds+"s · "+d;if(seconds>=15&&ConvertService.progress<0)d=seconds+"s · Waiting for the platform. You can switch tabs or cancel.";}
+        detail.setText(pendingStart?"Opening your link…":d);progress.setVisibility(working?View.VISIBLE:View.GONE);progress.setIndeterminate(pendingStart||ConvertService.progress<0);if(ConvertService.progress>=0)progress.setProgress(ConvertService.progress);
+        if(!b){cancel.setText("Cancel download");cancel.setEnabled(true);}cancel.setVisibility(b?View.VISIBLE:View.GONE);
+        update.setEnabled(!working&&!SocialAudio.updating);update.setText(SocialAudio.updating?"Updating…":"Update video support");updateDetail.setText(SocialAudio.updateStatus);if(selectedTab==1)refreshHistory();}
+    private void useMedia(Uri uri,String mime,boolean sharing){try{try(android.content.res.AssetFileDescriptor f=getContentResolver().openAssetFileDescriptor(uri,"r")){if(f==null)throw new java.io.FileNotFoundException();}
+        Intent i=new Intent(sharing?Intent.ACTION_SEND:Intent.ACTION_VIEW);if(sharing){i.setType(mime);i.putExtra(Intent.EXTRA_STREAM,uri);i.setClipData(ClipData.newRawUri("Saved media",uri));}else i.setDataAndType(uri,mime);i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,sharing?"Share media":"Open media"));
+        }catch(Exception e){Toast.makeText(this,"File unavailable, or no compatible player. Check Music / Movies → PocketMedia in Files.",Toast.LENGTH_LONG).show();}}
+    private void about(){String license="Pocket Media 4.0 · GPL-3.0\nyt-dlp / youtubedl-android 0.18.1\nFFmpeg · LAME 3.100 (LGPL 2.0 or later)\n\nSource and license:\nhttps://github.com/ahtishamite/webstorage/tree/pocket-audio-app/PocketAudio\n\n";
+        try(java.io.InputStream in=getAssets().open("LAME-LICENSE.txt")){java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1)bytes.write(buf,0,n);license+=bytes.toString("UTF-8");}catch(Exception ignored){}
+        TextView t=text(license,13,ink,false);t.setPadding(dp(18),dp(14),dp(18),dp(14));android.text.util.Linkify.addLinks(t,android.text.util.Linkify.WEB_URLS);ScrollView sv=new ScrollView(this);sv.addView(t);new AlertDialog.Builder(this).setTitle("About Pocket Media").setView(sv).setPositiveButton("Close",null).show();}
+    protected void onNewIntent(Intent i){super.onNewIntent(i);setIntent(i);receiveSharedLink(i);}
+    private void receiveSharedLink(Intent i){if(Intent.ACTION_SEND.equals(i.getAction())&&i.hasExtra(Intent.EXTRA_TEXT)){if(ConvertService.busy)Toast.makeText(this,"Finish the current download, then share the next link.",Toast.LENGTH_SHORT).show();else{link.setText(i.getStringExtra(Intent.EXTRA_TEXT));selectTab(0,false);}}}
     protected void onResume(){super.onResume();handler.post(refresh);}
-    protected void onPause(){handler.removeCallbacks(refresh);super.onPause();}
-    protected void onSaveInstanceState(Bundle b){b.putInt("mode",mode.getSelectedItemPosition());b.putString("link",link.getText().toString());b.putString("name",name.getText().toString());b.putInt("quality",quality.getSelectedItemPosition());super.onSaveInstanceState(b);}
+    protected void onPause(){handler.removeCallbacks(refresh);getSharedPreferences("draft",0).edit().putString("link",link.getText().toString()).putString("name",name.getText().toString()).putInt("mode",mode.getSelectedItemPosition()).putInt("quality",quality.getSelectedItemPosition()).apply();super.onPause();}
+    protected void onSaveInstanceState(Bundle b){b.putInt("mode",mode.getSelectedItemPosition());b.putInt("quality",quality.getSelectedItemPosition());b.putInt("tab",selectedTab);b.putString("link",link.getText().toString());b.putString("name",name.getText().toString());super.onSaveInstanceState(b);}
+    @Override public void onBackPressed(){if(selectedTab!=0)selectTab(0,true);else super.onBackPressed();}
+    private static class WaterBackground extends View {
+        final Paint paint=new Paint(3);WaterBackground(Context c){super(c);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
+        protected void onDraw(Canvas c){float w=getWidth(),h=getHeight();paint.setShader(new LinearGradient(0,0,w,h,new int[]{0xFFD9F5F4,0xFFE9EFFC,0xFFDCDFF9},null,Shader.TileMode.CLAMP));c.drawRect(0,0,w,h,paint);
+            orb(c,w*.96f,h*.24f,w*.70f,0x6692CFEE);orb(c,w*.04f,h*.68f,w*.67f,0x7798E7DA);orb(c,w*.83f,h*.90f,w*.7f,0x559DADF5);
+            drop(c,w*.90f,h*.115f,w*.105f);drop(c,w*.025f,h*.51f,w*.072f);}
+        void orb(Canvas c,float x,float y,float r,int color){paint.setShader(new RadialGradient(x,y,r,new int[]{color,Color.TRANSPARENT},null,Shader.TileMode.CLAMP));c.drawCircle(x,y,r,paint);}
+        void drop(Canvas c,float x,float y,float r){paint.setShader(new LinearGradient(x-r,y-r,x+r,y+r,new int[]{0xBFFFFFFF,0x2282BFD7,0x99FFFFFF},null,Shader.TileMode.CLAMP));c.drawCircle(x,y,r,paint);paint.setShader(null);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.5f);paint.setColor(0xBFFFFFFF);c.drawCircle(x,y,r,paint);paint.setStyle(Paint.Style.FILL);orb(c,x-r*.3f,y-r*.4f,r*.43f,0xCCFFFFFF);}
+    }
 }

@@ -50,7 +50,7 @@ jobs:
           profile: pixel_2
           working-directory: PocketAudio
           disable-animations: true
-          script: python3 scripts/smoke3.py
+          script: python3 scripts/smoke4.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
