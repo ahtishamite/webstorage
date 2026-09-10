@@ -34,8 +34,8 @@ final class SocialAudio {
             finally{updating=false;}
         },"media-support-update").start();return true;
     }
-    static void cancel(){new Thread(()->{try{YoutubeDL.getInstance().destroyProcessById(PROCESS);}catch(Exception ignored){}},"cancel-extractor").start();}
-    static void convert(Context c,String url,File output,int bitrate,boolean video,int height,Progress p) throws Exception {
+    static void cancel(){NativeMedia.cancel();new Thread(()->{try{YoutubeDL.getInstance().destroyProcessById(PROCESS);}catch(Exception ignored){}},"cancel-extractor").start();}
+    static String convert(Context c,String url,File output,int bitrate,boolean video,int height,int fps,Progress p) throws Exception {
         File work=new File(c.getCacheDir(),"social-"+System.nanoTime());
         if(!work.mkdirs())throw new IOException("Could not create temporary storage.");
         try {
@@ -44,16 +44,21 @@ final class SocialAudio {
             if(p.cancelled())throw new CancellationException();
             p.update("Reading video link","Connecting to the video platform…",-1);
             YoutubeDLRequest r=new YoutubeDLRequest(url);
+            r.addOption("--cache-dir",new File(c.getNoBackupFilesDir(),"extractor-cache").getAbsolutePath());
+            r.addOption("--write-info-json");
             r.addOption("--no-playlist");r.addOption("--playlist-items","1");
             r.addOption("--socket-timeout","20");r.addOption("--retries","2");r.addOption("--extractor-retries","2");
             r.addOption("--max-filesize",String.valueOf(Math.max(1,c.getCacheDir().getUsableSpace()/3)));r.addOption("--no-mtime");r.addOption("--newline");
             if(video){
                 String landscape="[height<=?"+height+"]", portrait="[width<=?"+height+"]";
-                r.addOption("-f","bv"+landscape+"+ba/bv"+portrait+"+ba/b"+landscape+"/b"+portrait);
-                r.addOption("-S","res:"+height+",fps:60,ext:mp4:m4a");
+                String base="bv"+landscape+"+ba/bv"+portrait+"+ba/b"+landscape+"/b"+portrait+"/bv"+landscape+"/bv"+portrait;
+                String safe="[vcodec^=avc][fps<=?"+fps+"]";
+                String preferred="bv"+safe+landscape+"+ba[acodec^=mp4a]/bv"+safe+portrait+"+ba[acodec^=mp4a]/b"+safe+landscape+"[acodec^=mp4a]/b"+safe+portrait+"[acodec^=mp4a]/";
+                r.addOption("-f",(height<=1080?preferred:"")+base);
+                r.addOption("-S","res:"+height+",fps:"+fps+",ext:mp4:m4a");
                 r.addOption("--merge-output-format","mp4");r.addOption("--remux-video","mp4");
             }else{r.addOption("-f","bestaudio/best");r.addOption("-x");r.addOption("--audio-format","mp3");r.addOption("--audio-quality",bitrate+"K");}
-            r.addOption("--fragment-retries","3");r.addOption("--concurrent-fragments","2");
+            r.addOption("--fragment-retries","3");r.addOption("--concurrent-fragments","4");
             r.addOption("-o",new File(work,"audio.%(ext)s").getAbsolutePath());
             YoutubeDL.getInstance().execute(r,PROCESS,(progress,eta,line)->{
                 boolean encoding=line.contains("ExtractAudio")||line.contains("Merger")||line.contains("VideoRemuxer")||line.contains("ffmpeg");
@@ -66,7 +71,13 @@ final class SocialAudio {
             if(p.cancelled())throw new CancellationException();
             File mp3=new File(work,video?"audio.mp4":"audio.mp3");
             if(!mp3.isFile()||mp3.length()==0)throw new IOException("No audio was returned. Check that the link opens a public video.");
+            String title=null;
+            File metadata=new File(work,"audio.info.json");
+            if(metadata.isFile()&&metadata.length()<8*1024*1024){try{title=new org.json.JSONObject(new String(Files.readAllBytes(metadata.toPath()),java.nio.charset.StandardCharsets.UTF_8)).optString("title",null);}catch(Exception ignored){}}
+            if(video&&height<=1080)NativeMedia.makeCompatible(c,mp3,height,fps,p);
             Files.move(mp3.toPath(),output.toPath(),StandardCopyOption.REPLACE_EXISTING);
+            return title;
+
         } catch(com.yausername.youtubedl_android.YoutubeDLException e){
             if(p.cancelled())throw new CancellationException();
             String err=String.valueOf(e.getMessage()).toLowerCase(Locale.ROOT);

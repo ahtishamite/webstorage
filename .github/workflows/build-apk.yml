@@ -26,7 +26,7 @@ jobs:
       - name: Download MP3 encoder source
         run: python3 scripts/prepare_lame.py
       - name: Build and lint
-        run: gradle --no-daemon assembleDebug lintDebug
+        run: gradle --no-daemon assembleDebug assembleDebugAndroidTest lintDebug
       - name: Verify APK signature
         run: "$ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/debug/app-debug.apk"
       - uses: actions/upload-artifact@v4
@@ -50,9 +50,10 @@ jobs:
           profile: pixel_2
           working-directory: PocketAudio
           disable-animations: true
-          script: python3 scripts/smoke4.py
+          script: python3 scripts/smoke5.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: PocketAudio-Verification
           path: PocketAudio/smoke-results
+

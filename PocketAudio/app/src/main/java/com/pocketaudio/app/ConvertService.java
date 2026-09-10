@@ -31,8 +31,8 @@ public class ConvertService extends Service {
   startedAt=SystemClock.elapsedRealtime();busy=true;cancelled=false;storageError=null;result=null;status="Starting download";detail="Preparing your media…";progress=-1;
   startForeground(7,notification());
   wake=((PowerManager)getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"PocketMedia:download");wake.acquire(6*60*60*1000L);
-  String url=i.getStringExtra("url"),name=i.getStringExtra("name");int bitrate=i.getIntExtra("bitrate",192),height=i.getIntExtra("height",1080);boolean video=i.getBooleanExtra("video",false);
-  new Thread(()->runJob(url,name,bitrate,video,height,id),"media-download").start();return START_NOT_STICKY;
+  String url=i.getStringExtra("url");int fps=i.getIntExtra("fps",30);int bitrate=i.getIntExtra("bitrate",192),height=i.getIntExtra("height",1080);boolean video=i.getBooleanExtra("video",false);
+  new Thread(()->runJob(url,bitrate,video,height,fps,id),"media-download").start();return START_NOT_STICKY;
  }
  private Notification notification(){
   PendingIntent tap=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
@@ -57,17 +57,19 @@ public class ConvertService extends Service {
   MediaMetadataRetriever r=new MediaMetadataRetriever();
   try{r.setDataSource(f.getAbsolutePath());String w=r.extractMetadata(18),h=r.extractMetadata(19),fps=r.extractMetadata(25);return w!=null&&h!=null?w+" × "+h+(fps!=null?" · "+fps+" fps":""):"MP4 video";}catch(Exception e){return "MP4 video";}finally{try{r.release();}catch(Exception ignored){}}
  }
- private void runJob(String url,String name,int bitrate,boolean video,int height,int startId){
+ private void runJob(String url,int bitrate,boolean video,int height,int fps,int startId){
   File output=null;Uri pending=null;
   final java.util.concurrent.atomic.AtomicBoolean finished=new java.util.concurrent.atomic.AtomicBoolean(false);
   Thread monitor=new Thread(()->{while(!finished.get()){if(getCacheDir().getUsableSpace()<128L*1024*1024){storageError="Storage is almost full. Free space and retry.";cancel();break;}try{Thread.sleep(1000);}catch(InterruptedException e){break;}}},"storage-monitor");monitor.start();
   try{
    check();output=File.createTempFile("media-",video?".mp4":".mp3",getCacheDir());
-   SocialAudio.convert(this,normalize(url),output,bitrate,video,height,new SocialAudio.Progress(){public void update(String t,String d,int p){ConvertService.this.update(t,d,p);}public boolean cancelled(){return cancelled;}});check();
+   String name=SocialAudio.convert(this,normalize(url),output,bitrate,video,height,fps,new SocialAudio.Progress(){public void update(String t,String d,int p){ConvertService.this.update(t,d,p);}public boolean cancelled(){return cancelled;}});check();
    if(output.length()+128L*1024*1024>getCacheDir().getUsableSpace())throw new IOException("Not enough storage to save the finished file. Free space and retry.");
    String info=mediaInfo(output,video),extension=video?".mp4":".mp3";resultMime=video?"video/mp4":"audio/mpeg";
-   String safe=(name==null?"My media":name).replaceAll("(?i)\\.(mp3|mp4)$","").replaceAll("[^\\p{L}\\p{N} _-]","_").trim();if(safe.isEmpty())safe="My media";if(safe.length()>70)safe=safe.substring(0,70);
-   String filename=safe+"-"+System.currentTimeMillis()+extension;
+   String safe=(name==null?(video?"Video":"Audio"):name).replaceAll("[\\p{Cntrl}\\\\/:*?\"<>|]"," ").replaceAll("\\s+"," ").trim();
+   if(safe.isEmpty())safe=video?"Video":"Audio";
+   while(safe.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>180)safe=safe.substring(0,safe.offsetByCodePoints(safe.length(),-1));
+   String filename=safe+extension;
    String folder=(video?Environment.DIRECTORY_MOVIES:Environment.DIRECTORY_MUSIC)+"/PocketMedia";
    ContentValues v=new ContentValues();v.put(MediaStore.MediaColumns.DISPLAY_NAME,filename);v.put(MediaStore.MediaColumns.MIME_TYPE,resultMime);v.put(MediaStore.MediaColumns.RELATIVE_PATH,folder);v.put(MediaStore.MediaColumns.IS_PENDING,1);
    Uri collection=video?MediaStore.Video.Media.EXTERNAL_CONTENT_URI:MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;

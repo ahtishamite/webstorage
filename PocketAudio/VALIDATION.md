@@ -1,19 +1,7 @@
-# Validation record
+# Validation status
 
-## Completed in the authoring environment
+V5: XML resource parsing and Python test-script syntax checks passed locally. Java compilation, Android lint, codec conversion, animated launch, screenshots and Android playback tests remain pending because publication to the public build repository was blocked by automatic approval review.
 
-- Parsed Android manifest, theme and icon XML.
-- Parsed GitHub Actions YAML and checked the build and upload job structure.
-- Python syntax check for the upstream encoder preparation script.
-- Verified manifest activity/service declarations have corresponding Java files.
-- Inspected JNI names against the Java native declarations and build library name.
-- Reviewed download limits, timeout handling, redirect checks, cancellation, pending-file rollback and output-stream cleanup.
+The black-screen root cause is inferred to be codec compatibility. The user's failing YouTube file was not provided, so the exact offending codec has not been inspected. V5's proposed default H.264/AAC path addresses that compatibility class; 4K–8K Original modes retain their hardware/player limitations.
 
-## Not executed
-
-- Gradle dependency resolution, Android lint, Java/C compilation, APK signing verification.
-- Automated instrumentation tests, emulator or physical-device tests.
-- An end-to-end MP4 → MP3 conversion inside the Android app.
-- GitHub Actions workflow execution.
-
-Reason: the Android build tools were absent and the SDK download request was blocked. No APK is included, and the app must not be described as compiled or device-tested.
+V4 previously passed build, lint, signature and Android 15 emulator tests for MP3, 1080p60, separate tabs, draft/quality restoration and cancellation (workflow run 34436134531). V3 previously passed short 4K, 6K and 8K fixture tests. Those results do not establish V5 success.
