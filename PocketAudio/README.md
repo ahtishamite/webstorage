@@ -1,31 +1,32 @@
-# Pocket Media 5.0 — source awaiting build verification
+# Pocket Media 5.0
 
-This revision has not yet been compiled or device-tested. Automated approval review blocked publication of the changes to the public build repository. No v5 APK has been produced.
+Android audio/video downloader with a liquid-glass-inspired interface, separate Download / Recent / Settings tabs, original-title filenames and an approximately 1.8-second animated cold-launch splash.
 
-## Changes ready for review
+## Install
 
-- Liquid-glass-inspired surfaces and a media play/download icon replace the water-drop graphics.
-- A 1.6-second launch overlay animates the icon and equalizer, then fades for 220 ms. It is skipped when receiving shared links or when a download is active. Tools warm in the background.
-- The manual filename field is removed. yt-dlp metadata supplies the original title during the same download request. The save layer sanitizes unsafe filename characters and limits UTF-8 filename length.
-- 720p and 1080p selections prefer H.264 video and AAC audio. The app probes downloaded tracks and converts incompatible codecs/pixel formats only when needed. 1080p60 has its own selection.
-- Best, 4K, 6K and 8K preserve original codecs. The interface explains that some Gallery players cannot decode these formats. These modes do not promise universal playback.
-- Extractor cache and four parallel fragments are enabled. No online update check is inserted before downloads. Platform response and transfer time cannot be made instant.
-- About is organized into readable sections, separate full-license readers and upstream project links.
+Android 10 (API 29) or later is required. The universal APK includes arm64-v8a, armeabi-v7a and x86_64 libraries. Version code 5, version name 5.0.
 
-## Build and test
+The delivered APK is a non-debuggable release signed with a permanent private release key. Uninstall v4 before installing this release because the signing certificate changed. App history and preferences reset; shared Gallery/Music downloads remain. Future updates must use the same release key. A generic warning when opening an APK received through WhatsApp may remain. The other reported phone's exact installation failure was not identified without its Android version and installer log.
 
-Use repository-root `.github/workflows/build-apk.yml`, with working directory `PocketAudio`. It builds the main APK and instrumentation APK, runs lint/signature checks and launches Android 15 tests.
+## Features
 
-Local build requires JDK 17, Gradle 8.11.1, Android SDK 35, NDK 28.0.13004108 and CMake 3.22.1.
+- Original platform title is retrieved during download and sanitized for the saved filename.
+- 720p and 1080p Gallery-safe modes prefer H.264/AAC and convert incompatible tracks when necessary. 1080p60 has a separate option.
+- Best / 4K / 6K / 8K Original modes retain source codecs and require a compatible player/device.
+- Extractor caching, early initialization and four parallel fragments reduce avoidable waiting. Network and platform response time still apply.
+- About uses readable sections and separate full-license readers.
+- Saved media appears in Movies/PocketMedia or Music/PocketMedia.
+
+## Build
+
+Requires JDK 17, Gradle 8.11.1, Android SDK 35, NDK 28.0.13004108 and CMake 3.22.1.
 
 ```sh
 cd PocketAudio
 python3 scripts/prepare_lame.py
-gradle --no-daemon assembleDebug assembleDebugAndroidTest lintDebug
+gradle --no-daemon assembleRelease assembleReleaseAndroidTest lintRelease
 ```
 
-`smoke5.py` exercises MP3, H.264 1080p60, VP9-to-H.264 and AV1-to-H.264 downloads using generated local samples. It checks title-derived filenames and invokes `PlaybackChecks` to decode visible frames through Android's own MediaMetadataRetriever. This test suite is prepared but has not run for v5.
+CI uses a temporary test certificate so instrumentation can run against the release build. Distribution requires re-signing with the privately retained release key; no private signing material belongs in this public repository.
 
-The workflow uses debug signing. A previous installation may require uninstalling before a new APK can be installed. Shared Gallery/Music files remain, while the app's history/draft is reset. This is not a Play Store release bundle.
-
-License: GPL-3.0; see LICENSE and applicable upstream licenses.
+See VALIDATION.md for test evidence and limits. License: GPL-3.0 and applicable upstream notices.
