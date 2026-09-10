@@ -172,7 +172,7 @@ public class MainActivity extends Activity {
     private void receiveSharedLink(Intent i){if(Intent.ACTION_SEND.equals(i.getAction())&&i.hasExtra(Intent.EXTRA_TEXT)){if(ConvertService.busy)Toast.makeText(this,"Finish the current download, then share the next link.",Toast.LENGTH_SHORT).show();else{link.setText(i.getStringExtra(Intent.EXTRA_TEXT));selectTab(0,false);}}}
     protected void onResume(){super.onResume();handler.post(refresh);}
     protected void onPause(){handler.removeCallbacks(refresh);getSharedPreferences("draft",0).edit().putString("link",link.getText().toString()).putInt("mode",mode.getSelectedItemPosition()).putInt("quality",quality.getSelectedItemPosition()).apply();super.onPause();}
-    protected void onSaveInstanceState(Bundle b){b.putInt("mode",mode.getSelectedItemPosition());b.putInt("quality",quality.getSelectedItemPosition());b.putInt("tab",selectedTab);b.putString("link",link.getText().toString());b;super.onSaveInstanceState(b);}
+    protected void onSaveInstanceState(Bundle b){b.putInt("mode",mode.getSelectedItemPosition());b.putInt("quality",quality.getSelectedItemPosition());b.putInt("tab",selectedTab);b.putString("link",link.getText().toString());super.onSaveInstanceState(b);}
     @Override public void onBackPressed(){if(selectedTab!=0)selectTab(0,true);else super.onBackPressed();}
     private static class LiquidBackground extends View {
         final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
