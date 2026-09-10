@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
     private Drawable ripple(Drawable d,int radius){return new RippleDrawable(ColorStateList.valueOf(0x22006E83),d,shape(Color.WHITE,radius));}
     private TextView text(String value,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setFontFeatureSettings("kern");if(bold)t.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));return t;}
     private void gap(LinearLayout l,int h){l.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(h)));}
-    private Button button(String value,boolean primary){Button b=new Button(this);b.setText(value);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(primary?Color.WHITE:accent);b.setTypeface(Typeface.create("sans-serif-medium",0));b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setPadding(dp(12),0,dp(12),0);
+    private Button button(String value,boolean primary){Button b=new Button(this);b.setText(value);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(primary?Color.WHITE:accent);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setPadding(dp(12),0,dp(12),0);
         Drawable d=glass(18,true);if(primary){GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF008B9C,0xFF3462C0});g.setCornerRadius(dp(18));d=g;}
         b.setBackground(ripple(d,18));return b;}
     private EditText input(String hint,int id){EditText e=new EditText(this);e.setId(id);e.setHint(hint);e.setTextColor(ink);e.setHintTextColor(muted);e.setTextSize(15);e.setSingleLine(true);e.setPadding(dp(13),0,dp(13),0);e.setBackground(ripple(glass(14,false),14));return e;}
