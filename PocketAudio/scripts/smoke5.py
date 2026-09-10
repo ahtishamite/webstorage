@@ -27,7 +27,7 @@ class MediaHandler(http.server.SimpleHTTPRequestHandler):
   try:super().do_GET()
   except (BrokenPipeError,ConnectionResetError):pass
 server=http.server.ThreadingHTTPServer(('0.0.0.0',8765),functools.partial(MediaHandler,directory=str(fixtures)));threading.Thread(target=server.serve_forever,daemon=True).start()
-print(adb('install','-r',str(root/'app/build/outputs/apk/debug/app-debug.apk')))
+print(adb('install','-r',str(root/'app/build/outputs/apk/release/app-release.apk')))
 adb('shell','pm','clear','com.pocketaudio.app');adb('shell','pm','grant','com.pocketaudio.app','android.permission.POST_NOTIFICATIONS')
 print(adb('shell','am','start','-W','-n','com.pocketaudio.app/.MainActivity'));time.sleep(4)
 for retry in range(8):
@@ -84,7 +84,7 @@ tap(seek('↓  Download'));seek('1080p60 · Gallery safe')
 # Restore the selected quality and draft after process restart.
 adb('shell','input','keyevent','3');time.sleep(1);adb('shell','am','force-stop','com.pocketaudio.app');adb('shell','am','start','-W','-n','com.pocketaudio.app/.MainActivity');time.sleep(2);seek('1080p60 · Gallery safe');seek('http://10.0.2.2:8765/AV1.html');shot('home-final')
 # Verify actual Android decoding, beyond a desktop FFmpeg codec check.
-adb('install','-r',str(root/'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'))
+adb('install','-r',str(root/'app/build/outputs/apk/androidTest/release/app-release-androidTest.apk'))
 playback=adb('shell','am','instrument','-w','com.pocketaudio.app.test/com.pocketaudio.app.PlaybackChecks');print(playback);assert 'ANDROID_VISIBLE_FRAMES_PASS count=3' in playback,playback
 # Structured About screen.
 adb('shell','am','start','-W','-n','com.pocketaudio.app/.MainActivity');time.sleep(2);tap(seek('⚙  Settings'));tap(seek('About & open-source licenses'));seek('How it works');shot('about');adb('shell','input','keyevent','4');tap(seek('↓  Download'))

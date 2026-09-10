@@ -26,13 +26,23 @@ jobs:
       - name: Download MP3 encoder source
         run: python3 scripts/prepare_lame.py
       - name: Build and lint
-        run: gradle --no-daemon assembleDebug assembleDebugAndroidTest lintDebug
+        run: gradle --no-daemon assembleRelease assembleReleaseAndroidTest lintRelease
       - name: Verify APK signature
-        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/debug/app-debug.apk"
+        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk"
+      - name: Stage signing tool and validate APK packaging
+        run: |
+          mkdir -p signing-tools
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" signing-tools/apksigner.jar
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PocketMedia-Signing-Tool
+          path: PocketAudio/signing-tools
       - uses: actions/upload-artifact@v4
         with:
           name: PocketAudio-APK
-          path: PocketAudio/app/build/outputs/apk/debug/app-debug.apk
+          path: PocketAudio/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Install media verification tools
         run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
@@ -51,9 +61,18 @@ jobs:
           working-directory: PocketAudio
           disable-animations: true
           script: python3 scripts/smoke5.py
+      - name: Verify Android 10 installation and update
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          working-directory: PocketAudio
+          disable-animations: true
+          script: python3 scripts/install29.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: PocketAudio-Verification
           path: PocketAudio/smoke-results
-

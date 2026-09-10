@@ -142,7 +142,7 @@ public class MainActivity extends Activity {
         aboutSection(content,"Playback & quality","Choose 720p or 1080p Gallery safe for H.264 video with AAC audio. Other codecs are converted only when needed. Original-quality options retain the source codecs; playback support varies by phone. No artificial upscaling.");
         aboutSection(content,"Storage & privacy","Videos are saved in Movies / PocketMedia; audio in Music / PocketMedia. Temporary files are removed after completion or handled cancellation. No app account, ads or analytics. The video platform receives requests from your connection.");
         aboutSection(content,"Source & licensing","Pocket Media is open-source under GNU GPL version 3. Third-party components retain their own licenses. Use content you own or have permission to download.");
-        linkButton(content,"View application source","https://github.com/ahtishamite/webstorage/tree/pocket-audio-app/PocketAudio");
+        linkButton(content,"View application source","https://github.com/ehtshamiqbal/webstorage/tree/pocket-audio-app/PocketAudio");
         Button gpl=button("Read GPL-3.0 license",false);content.addView(gpl);gpl.setOnClickListener(v->license("GNU GPL version 3","GPL-3.0.txt"));gap(content,20);
         content.addView(text("Open-source components",20,ink,true));gap(content,12);
         component(content,"yt-dlp","Finds public media streams and original titles. Unlicense; bundled dependencies may have additional terms.","https://github.com/yt-dlp/yt-dlp");
@@ -172,7 +172,7 @@ public class MainActivity extends Activity {
     private void receiveSharedLink(Intent i){if(Intent.ACTION_SEND.equals(i.getAction())&&i.hasExtra(Intent.EXTRA_TEXT)){if(ConvertService.busy)Toast.makeText(this,"Finish the current download, then share the next link.",Toast.LENGTH_SHORT).show();else{link.setText(i.getStringExtra(Intent.EXTRA_TEXT));selectTab(0,false);}}}
     protected void onResume(){super.onResume();handler.post(refresh);}
     protected void onPause(){handler.removeCallbacks(refresh);getSharedPreferences("draft",0).edit().putString("link",link.getText().toString()).putInt("mode",mode.getSelectedItemPosition()).putInt("quality",quality.getSelectedItemPosition()).apply();super.onPause();}
-    protected void onSaveInstanceState(Bundle b){b.putInt("mode",mode.getSelectedItemPosition());b.putInt("quality",quality.getSelectedItemPosition());b.putInt("tab",selectedTab);b.putString("link",link.getText().toString());b;super.onSaveInstanceState(b);}
+    protected void onSaveInstanceState(Bundle b){b.putInt("mode",mode.getSelectedItemPosition());b.putInt("quality",quality.getSelectedItemPosition());b.putInt("tab",selectedTab);b.putString("link",link.getText().toString());super.onSaveInstanceState(b);}
     @Override public void onBackPressed(){if(selectedTab!=0)selectTab(0,true);else super.onBackPressed();}
     private static class LiquidBackground extends View {
         final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
